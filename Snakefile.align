@@ -1,0 +1,37 @@
+#author: Jennifer Havens
+#dependancy of Snakemake.preprocessing
+#makes index files and aligns fastq reads to hg19 genome
+
+
+SAMPLES, = glob_wildcards("/home/exacloud/lustre1/SpellmanLab/havens/ATAC/samples/{smp}_R1.fastq") #will make a list of samples based on the files in sample folder which end with this pattern
+REF="/home/exacloud/lustre1/SpellmanLab/havens/ATAC/ref/ucsc.hg19.fasta" #give genome fasta file
+OUTdir="/home/exacloud/lustre1/SpellmanLab/havens/ATAC/sampAlign" #gives directory where aligned files will be output, end without /
+MAIL='havensj@ohsu.edu' #please change if using mail reporting function
+THREADS = 16
+
+rule all:
+    input:
+        expand("{OUTdir}/{smp}.sam", smp=SAMPLES)
+#    shell:
+#        "mail -s 'complete' {MAIL}"
+
+
+#Make index files of the referance genome for alignment, can run by snakemake -s Snakefile.align makeIndex, only needs to be run once
+rule makeIndex:
+    threads: {THREADS}
+    shell:
+        "bwa index -p ucsc.hg19.fasta -a bwtsw {REF}"
+
+
+#default target, aligns reads to reference genome, requires index files 
+rule BWAalign:
+    input:
+        read1="samples/{smp}_R1.fastq",
+        read2="samples/{smp}_R2.fastq",
+    output:
+        "{OUTdir}/{smp}.sam"
+    threads: {THREADS}
+    shell:
+        "bwa mem -t {threads} {REF} {input.read1} {input.read2} > {output}.sam"
+
+       

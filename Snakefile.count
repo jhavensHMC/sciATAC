@@ -1,0 +1,68 @@
+#author: Jennifer Havens
+#makes normalized expression matrix of single cells from peak.bed
+#run after split.sh 
+    #before running please set up sample_sheet.txt with header:
+    #sample_name                          group
+#once done can do monocle.r and TSCAN analysis
+
+#deal with multi > 1 input issues with snakemake
+#make into "fpkm_matrix.txt" #rows are gene names, columns are cells 
+
+
+
+SAMPLES, = glob_wildcards("/home/exacloud/lustre1/SpellmanLab/havens/ATAC/scAlign/{cell}.bam") #will make a list of samples based on the files in sample folder which end with this pattern
+ANNOT="/home/exacloud/lustre1/SpellmanLab/havens/ATAC/ref/ucsc.hg.annotations.gtf" #give genome fasta file
+OUTdir="/home/exacloud/lustre1/SpellmanLab/havens/ATAC/scAlign" #gives directory where files will be output, end without /
+MAIL='havensj@ohsu.edu' #please change if using mail reporting function
+THREADS = 16
+
+rule all:
+    input:
+        rule.tfIDF.output
+#    shell:
+#        "mail -s 'complete' {MAIL}"
+
+
+#count the number of reads each cell has in peaks in annotation file
+rule cuffquant:
+    input:
+        expand("scAlign/{cell}.bam", cell=SAMPLES)
+    output:
+        "{OUTdir}/{cell}_cuffquant/abundances.cxb"
+    threads: {THREADS}
+    shell:
+        "cuffquant -o CellA_cuffquant {ANNOT} {input}"
+
+#before running please set up sample_sheet.txt with header:
+#sample_name                          group
+
+#makes sample_sheet.txt with all the cells names
+rule makeSheet:
+    input:
+        expand("scAlign/{cell}.bam", cell=SAMPLES)
+    output:
+        "sample_sheet.txt"
+    shell:
+        "echo '{OUTdir}/{cell}_cuffquant/abundances.cxb    {cell}' >> sample_sheet.txt"
+
+
+#takes the counts from cuffquant and makes an expression matrix
+#note that this does its own normalization proceedure, which you may decide you dont want
+rule makeMatrix:
+    input:
+        peaks=rule.cuffquant.output,
+        sheet=rule.makeSheet.output
+    output:
+        "{OUTdir}/fpkm_matrix"
+    shell:
+        "cuffnorm --use-sample-sheet -o fpkm_matrix {ANNOT} sample_sheet.txt"
+
+
+#apply TF-IDF normalization to matrix
+rule tfIDF:
+	input:
+		rule.makeMatrix.output
+	output:
+		"{OUTdir}/fpkm_matrix.normalized"
+	shell:
+		"Rscript tfIDF.r {input} {output}"

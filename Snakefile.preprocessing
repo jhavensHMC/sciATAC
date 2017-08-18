@@ -1,0 +1,125 @@
+configfile: "config.yaml"
+#author: Jennifer Havens
+#takes fastq files, aligns them, conversts to bam files, does some proccessing, and makes peak.bed files 
+#run after making fastq files and SCIseq_NextSeqFastq_to_SCIseqFastq.pl
+#once done run chromVar analysis and split to single cell alignments
+
+SAMPLESDIC = config["samples"]
+JAVA="/usr/lib/jvm/jre-1.8.0/bin/java"
+THRESHOLD=500
+
+
+
+#README - information on modification for use:
+#when modifing the file please keep note of the spaces between the last charcter and the end "
+#to change what rules (and so what processes) are run, modify the targeting function, referance targetingNotes.txt
+#to change the which samples are being used for GATK as input adjust the config file
+#all sequences with *_R1.fasta will be aligned if STAR is run 
+#note when writing rules the length of inputs and outputs must be consistant, uses expand() to make this work out
+ 
+
+#returns a list of targets (output of run rules) without wildcards 
+#change lists in this function to adjust endpoint of script
+def targeting():
+    SAMPLES = list(SAMPLESDIC.keys())
+    #put string of the final target from the rules to be run, using WILD where the sample name would go, assosications are makred in targetNotes.txt
+    desiredWildTargets = ["logs/WILD.callPeaks.log"]
+    #if there is not sample name in the output file, put it in this list
+    targetList = []
+    for name in SAMPLES:
+        for tar in desiredWildTargets:
+            targetList.append(tar.replace("WILD", name))
+    return targetList
+
+#default target of snakemake
+rule all:
+    input:
+        targeting()
+
+onsuccess:
+    print("completed steps")
+
+onerror:
+    print("error has occured")
+
+
+#sets up inedx files of reference for alignment
+rule makeIndex:
+    shell:
+        "snakemake -s Snakefile.align makeIndex"
+
+
+#run BWA alignment, for each of the reads with *_R1.fasta pattern in samples folder
+rule BWAalign:
+    input:
+        "snakemake -s Snakefile.align"
+
+
+#converts sam alignments to bam files
+rule toBam:
+    input:
+        lambda wildcards: config["samples"][wildcards.sample]
+    output:
+        "sampAlign/{sample}_full.bam"
+    log:
+        "logs/{sample}.toBam.log"
+    #params:
+    shell:
+        "samtools view -b {input} -o {output}"
+
+#converts sorts all bam files
+rule sortBam:
+    input:
+        rules.toBam.output
+    output:
+        "sampAlign/{sample}_full.sorted.bam"
+    log:
+        "logs/{sample}.sort.log"
+    #params:
+    shell:
+        "samtools sort {input} {output}"
+
+#uses Vitak script to remove PCR dupilicates, with consideration for barcodes in names
+rule RemoveDuplicates:
+    input:
+        rules.sortBam.output
+    output:
+        "sampAlign/{sample}_noDup.bam"
+    log:
+        "logs/{sample}.noDup.log"
+    #params:
+    shell:
+        "perl SCIseq_RemoveDuplicates.pl {input} {output}"
+
+
+#filters the cells wich have below the threshold number of reads, uses Vitak script
+rule FilterToReadThreshold:
+    input:
+        rules.RemoveDuplicates.output
+    output:
+        "sampAlign/{sample}.bam"
+    log:
+        "logs/{sample}.filterCells.log"
+    shell:
+        "perl SCIseq_FilterBamToReadThreshold.pl {input} {THRESHOLD} {output}"
+
+#Adds standard RG notation to identify cell (used by chromVar), uses Vitak script
+rule AddRGtoBam:
+    input:
+        rules.FilterToReadThreshold.output
+    output:
+        "sampAlign/{sample}_rg.bam"
+    log:
+        "logs/{sample}.addRG.log"
+    shell:
+        "perl SCIseq_AddRGtoBam.pl {input} {output}"
+
+#calls peaks for each bam file with MACS2 to produce .bed for each sample
+rule callPeaks:
+    input:
+        rules.AddRGtoBam.output
+    log:
+        "logs/{sample}.callPeaks.log"
+    shell:
+        "macs2 callpeak -t {input} -f BAM -n {wildcards.sample} -B"
+

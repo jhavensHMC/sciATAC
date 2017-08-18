@@ -1,0 +1,63 @@
+#author: Jennifer Havens
+#makes  expression matrix of single cells from 5k windows linearly along the genome
+#run after split.sh 
+#once done can start aggregating cells with agCells.r
+
+#deal with multi > 1 input issues with snakemake
+#rows are gene names, columns are cells 
+
+
+
+SAMPLES, = glob_wildcards("/home/exacloud/lustre1/SpellmanLab/havens/ATAC/scAlign/{cell}.bam") #will make a list of samples based on the files in sample folder which end with this pattern
+ANNOT="/home/exacloud/lustre1/SpellmanLab/havens/ATAC/ref/ucsc.hg.annotations.gtf" #give genome fasta file
+OUTdir="/home/exacloud/lustre1/SpellmanLab/havens/ATAC/scAlign" #gives directory where files will be output, end without /
+MAIL='havensj@ohsu.edu' #please change if using mail reporting function
+THREADS = 16
+
+rule all:
+    input:
+        #rule.count.output
+        expand("{OUTdir}/{cell}_count.txt", cell=SAMPLES)
+#    shell:
+#        "mail -s 'complete' {MAIL}"
+
+
+#prepares index file for making genomic windows
+rule makeIndex:
+    output:
+        "ucsc.hg19.fai"
+    shell:
+        "samtools faidx ucsc.hg19.fasta"
+
+#makes genomic widows 5k from ucsc.hg19 genome
+rule makeWindows:
+    input:
+        rule.makeIndex.output 
+    output:
+        "gWindows.bed"
+    shell:
+        "bedtools makewindows -g {input} -w 5000 > {output}"
+
+#count the number of reads each cell has in 5k genomic windows
+rule count:
+    input:
+        aligned=expand("scAlign/{cell}.bam", cell=SAMPLES),
+        ref=rule.makeWindows.output
+    output:
+        "{OUTdir}/{cell}_count.txt"
+    threads: {THREADS}
+    shell:
+        "samtools depth -a -b {input.ref} -f {input.aligned} > {wildcards.cell}_count.txt"
+
+#run by snakemake -s Snakefile.linearCount putTogether after setting up matrix names by:
+#printf "'location' \n" > exprssRawCount
+#awk '{print $1}' cellA_count.txt >> exprssRawCount
+#this rule makes a matrix of all of the read counts for each aligned cell
+rule putTogether:
+    input:
+        rule.count.output
+    output:
+        "exprssRawCount"
+    shell:
+        "./puttTogether.sh {wildcards.cell} {output}"
+
