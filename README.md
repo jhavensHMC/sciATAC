@@ -144,7 +144,7 @@ More detailed Pipeline:
 		Run:
 		snakemake -s Snakefile.linearCount 
 		printf "'location' \n" > exprssRawCount
-		awk '{print $1}' cellA_count.txt >> exprssRawCount
+		awk '{print $1"_"$2}' cellA_count.txt >> exprssRawCount
 		chmod +x putTogether.sh
 		snakemake -s Snakefile.linearCount putTogether
 
