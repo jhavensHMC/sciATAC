@@ -1,7 +1,5 @@
 
-ATACnotes1.2
 #author: Jennifer Havens
-
 AIM
 	to identify characteristics of chromatin state which are associated with metastatic ability,
 	and to do this by comparing chromatin accessibility in primary, low burden, and high burden tumors
