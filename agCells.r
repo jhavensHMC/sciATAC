@@ -18,6 +18,9 @@ outClustInfoMName <- args[4]
 
 
 medClustSize <- 30
+ACCESSTHRESHOLD <- 500
+FREQTHRESHOLD <- 0.1
+
 
 #normalizes raw count expression matrix with TF-IDF alg
 #returns normalized matrix and saves into outNormM file
@@ -67,8 +70,8 @@ makeInfoMat <- function(mat){
   return(infoMat)
 }
 
-#finds the differance between 2 cells across all sties, returns distance
-findDis <- function(mat, clustA, clustB){
+#finds the square of the differance between 2 cells across all sties, returns distance
+findSqDis <- function(mat, clustA, clustB){
   disScore <- 0
   for (site in row.names(mat)){
     localDis <- (mat[,clustA][site] - mat[,clustB][site])^2
@@ -77,13 +80,55 @@ findDis <- function(mat, clustA, clustB){
   return(disScore)
 }
 
+#finds the square of the differance between 2 cells across all sties, keeps a list of previously calculated distances returns distance
+findSqDisFast <- function(mat, dict, clustA, clustB){
+  disScore <- 0
+  
+  for (site in row.names(mat)){
+    localDis <- (mat[,clustA][site] - mat[,clustB][site])^2
+    disScore <- disScore + localDis
+  }
+  return(disScore)
+}
+
+#filters out cells with too few reads (ACCESSTHRESHOLD)
+filterLowRead <- function(expressMat){
+  cellList <- colnames(expressMat)
+  saveList <- c()
+  for (cell in cellList){
+    if (sum(expressMat[,cell]) > ACCESSTHRESHOLD){
+      saveList <- c(saveList, cell)
+    } 
+  }
+  return(subset(expressMat, select = saveList))
+}
+
+
+#filters the sites with amount of observation below threshold across cells (FREQTHRESHOLD)
+filterLowFreq <- function(expressMat){
+  useMat <- t(expressMat)
+  siteList <- colnames(useMat)
+  cellNum <- length(row.names(useMat))
+  saveList <- c()
+  for (site in siteList){
+    if (sum(useMat[,site])/cellNum > FREQTHRESHOLD){
+      saveList <- c(saveList, site)
+    }
+  }
+  outMat <- subset(useMat, select = saveList)
+  return(t(outMat))
+}
+
+
 
   
 #returns clustered matrix and outputs clustered matrix and information matrix
 cluster <- function(clustMat){
+  clustMat <- filterLowFreq(clustMat) #optional filtering step, can adjust threshold at top of document
+  clustMat <- filterLowRead(clustMat) #optional filtering step, can adjust threshold at top of document
   clustInfoMat <- makeInfoMat(clustMat)
-  for(k in 1:2){
-  #while(median(clustInfoMat["numberOfCells",])<medClustSize){
+  #for(k in 1:2){
+  while(median(clustInfoMat["numberOfCells",])<medClustSize){
     clustNames <- colnames(clustMat)
     totalClusters <- length(clustNames)
     minScore <- Inf
@@ -91,7 +136,7 @@ cluster <- function(clustMat){
     for (i in 1:totalClusters){
       for (j in i:totalClusters){
         if (j>i){
-          score <- findDis(clustMat, clustNames[i], clustNames[j])
+          score <- findSqDis(clustMat, clustNames[i], clustNames[j])
           if (score < minScore){
             clustA <- clustNames[i]
             clustB <- clustNames[j]
@@ -137,5 +182,5 @@ cluster <- function(clustMat){
 }
 
 
-cluster(exprssM)
+cluster(exprssM) 
 
