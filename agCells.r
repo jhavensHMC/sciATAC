@@ -6,7 +6,7 @@
 args<-(commandArgs(TRUE))
 #raw count matrix 1st input, cells in cols, names should be in sample.cell format, will chage to seperate by "/" for interal work, outputs will change back
 exprssM <- read.table(args[1], head=TRUE, row.names=1)
-colnames(exprssM) <- gsub("[.]", "/", colnames(exprssM))
+colnames(exprssM) <- gsub(".", "/", colnames(exprssM))
 #second argument is output for normalized matrix
 outNomrMName <- args[2]
 
@@ -37,7 +37,7 @@ tfIDF <- function(expressM){
   
   #outputs normalized matrix with sample.cell naming format
   outNormM <- normM
-  colnames(outNormM) <- gsub("/", "[.]", colnames(outNormM))
+  colnames(outNormM) <- gsub("/", ".", colnames(outNormM))
   write.table(outNormM, outNomrMName, sep="\t")
   
 }
@@ -129,10 +129,10 @@ cluster <- function(clustMat){
   
   #outputs clustered matrix and its info matrix with sample.cell naming format
   outClustM <- clustMat
-  colnames(outClustM) <- gsub("/", "[.]", colnames(outClustM))
+  colnames(outClustM) <- gsub("/", ".", colnames(outClustM))
   write.table(outClustM, outClustMName, sep="\t")
   outclustInfoMat<- clustInfoMat
-  colnames(outclustInfoMat) <- gsub("/", "[.]", colnames(outclustInfoMat))
+  colnames(outclustInfoMat) <- gsub("/", ".", colnames(outclustInfoMat))
   write.table(outclustInfoMat, outClustInfoMName, sep="\t")
 }
 
