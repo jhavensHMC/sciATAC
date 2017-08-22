@@ -35,7 +35,7 @@ tfIDF <- function(expressM){
   }
   return(normM)
   
-  outputs normalized matrix with sample.cell naming format
+  #outputs normalized matrix with sample.cell naming format
   outNormM <- normM
   colnames(outNormM) <- gsub("/", "[.]", colnames(outNormM))
   write.table(outNormM, outNomrMName, sep="\t")
@@ -45,7 +45,7 @@ tfIDF <- function(expressM){
 #returns a matrix with clusterNames in col and rows with total number of cells in cluster (all 1) and the fraction of cells from each sample (all 0 or 1)
 makeInfoMat <- function(mat){
   #set up matrix structure and names
-  names <- strsplit(colnames(mat), "_")
+  names <- strsplit(colnames(mat), "/")
   sampleL <- c()
   for (i in 1: length(names)){
     sampleL<- c(sampleL, names[[i]][1])
@@ -82,7 +82,8 @@ findDis <- function(mat, clustA, clustB){
 #returns clustered matrix and outputs clustered matrix and information matrix
 cluster <- function(clustMat){
   clustInfoMat <- makeInfoMat(clustMat)
-  while(median(clustInfoMat["numberOfCells",])<medClustSize){
+  for(k in 1:2){
+  #while(median(clustInfoMat["numberOfCells",])<medClustSize){
     clustNames <- colnames(clustMat)
     totalClusters <- length(clustNames)
     minScore <- Inf
@@ -98,30 +99,35 @@ cluster <- function(clustMat){
         }
       }
     }
-    
-    
-    #combinding 2 nearest clusters
-    newClust <- (clustMat[,clustA]*clustInfoMat[,clustA]["numberOfCells"] +  clustMat[,clustB]*clustInfoMat[,clustB]["numberOfCells"])*0.5
-    newNames <- c(clustNames, paste(clustA, clustB, sep = "_"))
-    clustMat <- cbind(clustMat, newClust)
-    colnames(clustMat) <- newNames
+   
+    #combinding 2 nearest clusters in info mat
+    newCellNumber <- clustInfoMat[,clustA]["numberOfCells"] + clustInfoMat[,clustB]["numberOfCells"]
+    clustACellNumber <- clustInfoMat[,clustA]["numberOfCells"]
+    clustBCellNumber <- clustInfoMat[,clustB]["numberOfCells"]
+    newInfoClust <- clustInfoMat[,clustA]*(clustACellNumber)/newCellNumber +  clustInfoMat[,clustB]*(clustBCellNumber)/newCellNumber
+    clustInfoMat <- cbind(clustInfoMat, newInfoClust)
+    newName <- paste(clustA, clustB, sep = "_")
+    fullNames <- c(clustNames, newName)
+    colnames(clustInfoMat) <- fullNames
+    clustInfoMat[,newName]["numberOfCells"] <- newCellNumber
 
     outL <- c()
-    for (n in newNames){if (n != clustB & n != clustA){outL <- c(outL, n)} }
-    clustMat <- subset(clustMat, select = outL)
+    for (n in fullNames){if (n != clustB & n != clustA){outL <- c(outL, n)} }
 
-
-    newClust <- clustInfoMat[,clustA]*0.5 +  clustInfoMat[,clustB]*0.5
-    clustInfoMat <- cbind(clustInfoMat, newClust)
-    newName <- paste(clustA, clustB, sep = "_")
-    colnames(clustInfoMat) <- c(clustNames, newName)
-    clustInfoMat[,newName]["numberOfCells"] <- 2*clustInfoMat[,newName]["numberOfCells"]
     clustInfoMat <- subset(clustInfoMat, select = outL)
+    
+    #combinding 2 nearest clusters in expression mat
+    newClust <- clustMat[,clustA]*clustACellNumber/newCellNumber +  clustMat[,clustB]*clustBCellNumber/newCellNumber
+    clustMat <- cbind(clustMat, newClust)
+    colnames(clustMat) <-  fullNames
 
+    clustMat <- subset(clustMat, select = outL)
+    
   }
+  
   return(clustMat)
   
-  outputs clustered matrix and its info matrix with sample.cell naming format
+  #outputs clustered matrix and its info matrix with sample.cell naming format
   outClustM <- clustMat
   colnames(outClustM) <- gsub("/", "[.]", colnames(outClustM))
   write.table(outClustM, outClustMName, sep="\t")
