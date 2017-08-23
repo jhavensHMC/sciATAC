@@ -10,6 +10,7 @@
 #rows are genes or peak sites, columns are cells, should have names in input matrix
 
 #then filteres cells based on low accesible sites and filters sites based on their accesablity across cells
+#filtering cells based on low accesible sites would have been done already based on outlined pipeline but if alternative pipeline used option to filter is here
 #can not do by returning normTbl instead of filterNormTbl
 
 

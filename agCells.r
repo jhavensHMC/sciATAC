@@ -1,7 +1,9 @@
 #author: Jennifer Havens
-#takes matrix of raw counts and returns matrixes TF-IDF normalized and a matrix with cells aggregated into groups
+#takes matrix of raw counts and returns matrixes of filterend and TF-IDF normalized and a matrix with filtered and normalized cells aggregated into groups
 #run after making raw matrix with Snakefile.linearCount
 #once done can re-do monocle.r and TSCAN analysis and compare to unag results
+#filtering cells based on low accesible sites would have been done already based on outlined pipeline but if alternative pipeline used option to filter is here
+
 
 args<-(commandArgs(TRUE))
 #raw count matrix 1st input, cells in cols, names should be in sample.cell format, will chage to seperate by "/" for interal work, outputs will change back
@@ -80,16 +82,6 @@ findSqDis <- function(mat, clustA, clustB){
   return(disScore)
 }
 
-#finds the square of the differance between 2 cells across all sties, keeps a list of previously calculated distances returns distance
-findSqDisFast <- function(mat, dict, clustA, clustB){
-  disScore <- 0
-  
-  for (site in row.names(mat)){
-    localDis <- (mat[,clustA][site] - mat[,clustB][site])^2
-    disScore <- disScore + localDis
-  }
-  return(disScore)
-}
 
 #filters out cells with too few reads (ACCESSTHRESHOLD)
 filterLowRead <- function(expressMat){
