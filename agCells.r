@@ -19,9 +19,10 @@ outClustMName <- args[3]
 outClustInfoMName <- args[4]
 
 
-medClustSize <- 30
+medClustSize <- 30 #option instead of CLUSTERNUMBER to aggregate until meadian cell cluster has more than x cells in it, switch to while loop in cluster function
 ACCESSTHRESHOLD <- 500
 FREQTHRESHOLD <- 0.1
+CLUSTERNUMBER <- 100 #option instead of medClustSize to give the number of times to cluster, switch to for loop in cluster function
 
 
 #normalizes raw count expression matrix with TF-IDF alg
@@ -119,7 +120,7 @@ cluster <- function(clustMat){
   clustMat <- filterLowFreq(clustMat) #optional filtering step, can adjust threshold at top of document
   clustMat <- filterLowRead(clustMat) #optional filtering step, can adjust threshold at top of document
   clustInfoMat <- makeInfoMat(clustMat)
-  #for(k in 1:2){
+  #for(k in 1:CLUSTERNUMBER){
   while(median(clustInfoMat["numberOfCells",])<medClustSize){
     clustNames <- colnames(clustMat)
     totalClusters <- length(clustNames)
