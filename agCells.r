@@ -163,17 +163,98 @@ cluster <- function(clustMat){
     
   }
   
-  return(clustMat)
-  
-  #outputs clustered matrix and its info matrix with sample.cell naming format
-  outClustM <- clustMat
-  colnames(outClustM) <- gsub("/", ".", colnames(outClustM))
-  write.table(outClustM, outClustMName, sep="\t")
-  outclustInfoMat<- clustInfoMat
-  colnames(outclustInfoMat) <- gsub("/", ".", colnames(outclustInfoMat))
-  write.table(outclustInfoMat, outClustInfoMName, sep="\t")
+  return(list(clustMat, clustInfoMat))
+
 }
 
 
-cluster(exprssM) 
 
+#returns clustered matrix and outputs clustered matrix and information matrix
+permuteCluster <- function(clustMat){
+  clustMat <- filterLowFreq(clustMat) #optional filtering step, can adjust threshold at top of document
+  clustMat <- filterLowRead(clustMat) #optional filtering step, can adjust threshold at top of document
+  clustInfoMat <- makeInfoMat(clustMat)
+  #for(k in 1:CLUSTERNUMBER){
+  while(median(clustInfoMat["numberOfCells",])<medClustSize){
+    clustNames <- colnames(clustMat)
+    totalClusters <- length(clustNames)
+    minScore <- Inf
+    #comparing distances between all cells
+    for (i in 1:totalClusters){
+      for (j in i:totalClusters){
+        if (j>i){
+          score <- runif(1, 0, length(totalClusters))  
+          if (score < minScore){
+            clustA <- clustNames[i]
+            clustB <- clustNames[j]
+          }
+        }
+      }
+    }
+    
+    #combinding 2 nearest clusters in info mat
+    newCellNumber <- clustInfoMat[,clustA]["numberOfCells"] + clustInfoMat[,clustB]["numberOfCells"]
+    clustACellNumber <- clustInfoMat[,clustA]["numberOfCells"]
+    clustBCellNumber <- clustInfoMat[,clustB]["numberOfCells"]
+    newInfoClust <- clustInfoMat[,clustA]*(clustACellNumber)/newCellNumber +  clustInfoMat[,clustB]*(clustBCellNumber)/newCellNumber
+    clustInfoMat <- cbind(clustInfoMat, newInfoClust)
+    newName <- paste(clustA, clustB, sep = "_")
+    fullNames <- c(clustNames, newName)
+    colnames(clustInfoMat) <- fullNames
+    clustInfoMat[,newName]["numberOfCells"] <- newCellNumber
+    
+    outL <- c()
+    for (n in fullNames){if (n != clustB & n != clustA){outL <- c(outL, n)} }
+    
+    clustInfoMat <- subset(clustInfoMat, select = outL)
+    
+    #combinding 2 nearest clusters in expression mat
+    newClust <- clustMat[,clustA]*clustACellNumber/newCellNumber +  clustMat[,clustB]*clustBCellNumber/newCellNumber
+    clustMat <- cbind(clustMat, newClust)
+    colnames(clustMat) <-  fullNames
+    
+    clustMat <- subset(clustMat, select = outL)
+    
+  }
+  
+  return(list(clustMat, clustInfoMat))
+  
+}
+
+#outputs 1st and 2nd matrix in list with sample.cell naming format into the output file numes input
+printingListOut <- function(matList, outExName, outInfoName){
+  
+  clustMat <- matList[[1]]
+  clustInfoMat <- matList[[2]]
+  
+  
+  
+  outClustM <- clustMat
+  colnames(outClustM) <- gsub("/", ".", colnames(outClustM))
+  write.table(outClustM, outExName, sep="\t")
+  outclustInfoMat<- clustInfoMat
+  colnames(outclustInfoMat) <- gsub("/", ".", colnames(outclustInfoMat))
+  write.table(outclustInfoMat, outInfoName, sep="\t")
+}
+
+
+#clusters matrix and prints output into argument files
+agMatList <- cluster(exprssM)
+printingOut(agMatList, outClustMName, outClustInfoMName) 
+
+#agrigates clusters based on random combinations not distance and prints output into argument files _permute
+perMatList <- permuteCluster(exprssM)
+printingOut(perMatList, paste(outClustMName, "_permute", sep = ""), paste(outClustInfoMName, "_permute", sep = "")) 
+
+#returns average percent of the most common sample in each cluster
+testSampMix <- function(infoMat){
+  maxSampPerL <- c()
+  for (cell in colnames(infoMat)){
+    clusterPer <- max(infoMat[,cell][2:length(row.names(infoMat))])
+    maxSampPerL <- c(maxSampPerL, clusterPer)
+  }
+  return(mean(maxSampPerL))
+}
+
+#intended to use this as a metrix for the effectiveness of clustering, if there is high sample mixture (low % dominance), that indicates unalike cells are being clustered
+return(list("Average percent of dominate sample in clustered ", testSampMix(agMatList[[2]]), "Average percent of dominate sample in permuted ", testSampMix(perMatList[[2]])))
