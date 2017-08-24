@@ -32,6 +32,7 @@ Running Files:
 	putTogether.sh
 	agCells.r
 
+You may want to also consider GC bias and index collisions 
 
 More detailed Pipeline:
 
